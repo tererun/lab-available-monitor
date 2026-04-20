@@ -72,36 +72,36 @@ class NFCReader(CardReader):
                 self._stop.wait(2)
                 continue
             try:
-                self._poll_until_tap(clf, nfc)
+                while not self._stop.is_set():
+                    clf.connect(
+                        rdwr={
+                            "on-startup": self._on_startup(nfc_mod=nfc),
+                            "on-connect": self._on_connect,
+                        },
+                        terminate=lambda: self._stop.is_set(),
+                    )
+            except Exception as e:
+                print(f"nfc connect エラー: {e}")
             finally:
                 try:
                     clf.close()
                     _log("clf closed")
-                except Exception as e:
-                    _log(f"clf close error: {e}")
-            self._stop.wait(0.3)
+                except Exception:
+                    pass
+            self._stop.wait(1.0)
 
-    def _poll_until_tap(self, clf, nfc_mod):
-        """1タップ検出したら return し、呼び出し側で clf を開き直させる。"""
-        while not self._stop.is_set():
-            target = nfc_mod.clf.RemoteTarget("212F")
-            target.sensf_req = SUICA_SENSF_REQ
-            try:
-                res = clf.sense(target, iterations=3, interval=0.1)
-            except nfc_mod.clf.CommunicationError as e:
-                _log(f"CommunicationError: {e}")
-                continue
-            except Exception as e:
-                print(f"sense エラー: {e}")
-                return
+    def _on_startup(self, nfc_mod):
+        def startup(targets):
+            t = nfc_mod.clf.RemoteTarget("212F")
+            t.sensf_req = SUICA_SENSF_REQ
+            return [t]
+        return startup
 
-            if res is None or res.sensf_res is None:
-                continue
-
-            idm = res.sensf_res[1:9].hex().upper()
-            _log(f"tag detected: {idm}")
-            self._dispatch(idm)
-            return
+    def _on_connect(self, tag):
+        idm = tag.identifier.hex().upper()
+        _log(f"tag detected: {idm}")
+        self._dispatch(idm)
+        return True  # release tag and return from connect()
 
 
 class DemoReader(CardReader):
