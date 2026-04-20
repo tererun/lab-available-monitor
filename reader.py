@@ -69,8 +69,8 @@ class NFCReader(CardReader):
                 clf.close()
 
     def _poll(self, clf, nfc_mod):
-        last_idm: str | None = None
-        last_time = 0.0
+        card_present = False
+        last_dispatch = 0.0
         while not self._stop.is_set():
             target = nfc_mod.clf.RemoteTarget("212F")
             target.sensf_req = SUICA_SENSF_REQ
@@ -83,24 +83,20 @@ class NFCReader(CardReader):
                 self._stop.wait(0.5)
                 continue
 
-            if res is None:
-                last_idm = None
+            if res is None or res.sensf_res is None:
+                card_present = False
                 continue
 
-            try:
-                tag = nfc_mod.tag.activate(clf, res)
-            except Exception as e:
-                print(f"tag activate エラー: {e}")
-                continue
-            if tag is None:
+            if card_present:
                 continue
 
-            idm = tag.identifier.hex().upper()
             now = time.monotonic()
-            if idm == last_idm and (now - last_time) < READ_COOLDOWN:
+            if (now - last_dispatch) < READ_COOLDOWN:
                 continue
-            last_idm = idm
-            last_time = now
+
+            idm = res.sensf_res[1:9].hex().upper()
+            card_present = True
+            last_dispatch = now
             self._dispatch(idm)
 
 
