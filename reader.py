@@ -1,7 +1,15 @@
+import os
 import threading
 import time
 from abc import ABC, abstractmethod
 from typing import Callable
+
+DEBUG = os.environ.get("NFC_DEBUG") == "1"
+
+
+def _log(msg: str):
+    if DEBUG:
+        print(f"[nfc] {msg}", flush=True)
 
 
 TagHandler = Callable[[str], None]
@@ -54,50 +62,46 @@ class NFCReader(CardReader):
     def _run(self):
         import nfc
         import nfc.clf
-        import nfc.tag
 
         while not self._stop.is_set():
             try:
                 clf = nfc.ContactlessFrontend(self._device)
+                _log(f"clf opened: {clf}")
             except OSError as e:
                 print(f"NFCリーダーに接続できません: {e}")
                 self._stop.wait(2)
                 continue
             try:
-                self._poll(clf, nfc)
+                self._poll_until_tap(clf, nfc)
             finally:
-                clf.close()
+                try:
+                    clf.close()
+                    _log("clf closed")
+                except Exception as e:
+                    _log(f"clf close error: {e}")
+            self._stop.wait(0.3)
 
-    def _poll(self, clf, nfc_mod):
-        card_present = False
-        last_dispatch = 0.0
+    def _poll_until_tap(self, clf, nfc_mod):
+        """1タップ検出したら return し、呼び出し側で clf を開き直させる。"""
         while not self._stop.is_set():
             target = nfc_mod.clf.RemoteTarget("212F")
             target.sensf_req = SUICA_SENSF_REQ
             try:
                 res = clf.sense(target, iterations=3, interval=0.1)
-            except nfc_mod.clf.CommunicationError:
+            except nfc_mod.clf.CommunicationError as e:
+                _log(f"CommunicationError: {e}")
                 continue
             except Exception as e:
                 print(f"sense エラー: {e}")
-                self._stop.wait(0.5)
-                continue
+                return
 
             if res is None or res.sensf_res is None:
-                card_present = False
-                continue
-
-            if card_present:
-                continue
-
-            now = time.monotonic()
-            if (now - last_dispatch) < READ_COOLDOWN:
                 continue
 
             idm = res.sensf_res[1:9].hex().upper()
-            card_present = True
-            last_dispatch = now
+            _log(f"tag detected: {idm}")
             self._dispatch(idm)
+            return
 
 
 class DemoReader(CardReader):
