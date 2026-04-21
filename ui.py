@@ -687,7 +687,16 @@ class App:
         pad_top = 14 if compact else 24
         pad_gap = 4 if compact else 6
 
-        header = ttk.Frame(body, style="App.TFrame", padding=(pad_x, pad_top, pad_x, pad_gap))
+        btns = ttk.Frame(body, style="App.TFrame", padding=(pad_x, 8, pad_x, 16 if compact else 24))
+        btns.pack(side="bottom", fill="x")
+
+        keyboard_wrap = ttk.Frame(body, style="App.TFrame", padding=(pad_x, 8 if compact else 12))
+        keyboard_wrap.pack(side="bottom", fill="x")
+
+        scroll_inner, scroll_wrap, scroll_canvas = self._scrollable_area(body)
+        scroll_wrap.pack(side="top", fill="both", expand=True)
+
+        header = ttk.Frame(scroll_inner, style="App.TFrame", padding=(pad_x, pad_top, pad_x, pad_gap))
         header.pack(fill="x")
         ttk.Label(header, text="ユーザー登録", style="DialogHeader.TLabel").pack(anchor="w")
         tk.Label(header,
@@ -695,7 +704,7 @@ class App:
                  bg=BG, fg=FG_MUTED,
                  font=(MONO_FONT, 12)).pack(anchor="w", pady=(6, 0))
 
-        content = ttk.Frame(body, style="App.TFrame", padding=(pad_x, pad_gap, pad_x, pad_gap))
+        content = ttk.Frame(scroll_inner, style="App.TFrame", padding=(pad_x, pad_gap, pad_x, pad_gap))
         content.pack(fill="x")
 
         existing_users = self.db.list_users()
@@ -777,8 +786,6 @@ class App:
         name_entry.grid(row=1, column=1, sticky="ew", pady=row_pady)
         grid.columnconfigure(1, weight=1)
 
-        keyboard_wrap = ttk.Frame(body, style="App.TFrame", padding=(pad_x, 8 if compact else 12))
-        keyboard_wrap.pack(fill="x")
         if compact:
             kb_kwargs = dict(key_width=3, key_height=1, key_font_size=11, key_padx=1, key_pady=1)
         else:
@@ -788,6 +795,8 @@ class App:
         keyboard.set_target(sid_entry)
         sid_entry.bind("<FocusIn>", lambda _e: keyboard.set_target(sid_entry))
         name_entry.bind("<FocusIn>", lambda _e: keyboard.set_target(name_entry))
+        self._bind_autoscroll_on_focus(scroll_canvas, sid_entry)
+        self._bind_autoscroll_on_focus(scroll_canvas, name_entry)
         sid_entry.focus_set()
 
         def submit():
@@ -807,8 +816,6 @@ class App:
             self._close_dialog()
             self._open_status_dialog(user)
 
-        btns = ttk.Frame(body, style="App.TFrame", padding=(pad_x, 8, pad_x, 16 if compact else 24))
-        btns.pack(fill="x")
         ttk.Button(btns, text="新規登録", style="Action.TButton", command=submit).pack(side="right", padx=(8, 0))
         ttk.Button(btns, text="キャンセル", style="Secondary.TButton", command=self._close_dialog).pack(side="right")
 
@@ -825,14 +832,23 @@ class App:
         pad_top = 14 if compact else 24
         pad_gap = 4 if compact else 6
 
-        header = ttk.Frame(body, style="App.TFrame", padding=(pad_x, pad_top, pad_x, pad_gap))
+        btns = ttk.Frame(body, style="App.TFrame", padding=(pad_x, 8, pad_x, 16 if compact else 24))
+        btns.pack(side="bottom", fill="x")
+
+        keyboard_wrap = ttk.Frame(body, style="App.TFrame", padding=(pad_x, 8 if compact else 12))
+        keyboard_wrap.pack(side="bottom", fill="x")
+
+        scroll_inner, scroll_wrap, scroll_canvas = self._scrollable_area(body)
+        scroll_wrap.pack(side="top", fill="both", expand=True)
+
+        header = ttk.Frame(scroll_inner, style="App.TFrame", padding=(pad_x, pad_top, pad_x, pad_gap))
         header.pack(fill="x")
         ttk.Label(header, text="手動追加", style="DialogHeader.TLabel").pack(anchor="w")
         tk.Label(header,
                  text="カードを持っていない人向けの登録・更新",
                  bg=BG, fg=FG_MUTED, font=F(12)).pack(anchor="w", pady=(6, 0))
 
-        content = ttk.Frame(body, style="App.TFrame", padding=(pad_x, pad_gap, pad_x, pad_gap))
+        content = ttk.Frame(scroll_inner, style="App.TFrame", padding=(pad_x, pad_gap, pad_x, pad_gap))
         content.pack(fill="x")
 
         existing_users = self.db.list_users()
@@ -913,8 +929,6 @@ class App:
         name_entry.grid(row=1, column=1, sticky="ew", pady=row_pady)
         grid.columnconfigure(1, weight=1)
 
-        keyboard_wrap = ttk.Frame(body, style="App.TFrame", padding=(pad_x, 8 if compact else 12))
-        keyboard_wrap.pack(fill="x")
         if compact:
             kb_kwargs = dict(key_width=3, key_height=1, key_font_size=11, key_padx=1, key_pady=1)
         else:
@@ -924,6 +938,8 @@ class App:
         keyboard.set_target(sid_entry)
         sid_entry.bind("<FocusIn>", lambda _e: keyboard.set_target(sid_entry))
         name_entry.bind("<FocusIn>", lambda _e: keyboard.set_target(name_entry))
+        self._bind_autoscroll_on_focus(scroll_canvas, sid_entry)
+        self._bind_autoscroll_on_focus(scroll_canvas, name_entry)
         sid_entry.focus_set()
 
         def submit():
@@ -941,8 +957,6 @@ class App:
             self._close_dialog()
             self._open_status_dialog(user)
 
-        btns = ttk.Frame(body, style="App.TFrame", padding=(pad_x, 8, pad_x, 16 if compact else 24))
-        btns.pack(fill="x")
         ttk.Button(btns, text="新規登録", style="Action.TButton", command=submit).pack(side="right", padx=(8, 0))
         ttk.Button(btns, text="キャンセル", style="Secondary.TButton", command=self._close_dialog).pack(side="right")
 
@@ -951,20 +965,30 @@ class App:
         dlg_w, dlg_h = self._fit_dialog(dlg, 460, 600)
         dlg.minsize(min(360, dlg_w), min(420, dlg_h))
 
-        header = ttk.Frame(body, style="App.TFrame", padding=(32, 28, 32, 10))
+        compact = self._compact or dlg_h < 600
+        pad_x = 20 if compact else 32
+        pad_top = 16 if compact else 28
+
+        foot = ttk.Frame(body, style="App.TFrame", padding=(pad_x, 8, pad_x, 14 if compact else 24))
+        foot.pack(side="bottom", fill="x")
+
+        scroll_inner, scroll_wrap, _ = self._scrollable_area(body)
+        scroll_wrap.pack(side="top", fill="both", expand=True)
+
+        header = ttk.Frame(scroll_inner, style="App.TFrame", padding=(pad_x, pad_top, pad_x, 8))
         header.pack(fill="x")
         ttk.Label(header, text=user["name"], style="DialogHeader.TLabel").pack(anchor="w")
         tk.Label(header, text=f"学籍番号  {user['student_id']}",
                  bg=BG, fg=FG_MUTED, font=(MONO_FONT, 12)).pack(anchor="w", pady=(6, 0))
         tk.Label(header, text="ステータスを選んでください",
-                 bg=BG, fg=FG_SUBTLE, font=F(12)).pack(anchor="w", pady=(12, 0))
+                 bg=BG, fg=FG_SUBTLE, font=F(12)).pack(anchor="w", pady=(8 if compact else 12, 0))
 
         def choose(status: Status):
             self.db.log_status(user["id"], status)
             self._close_dialog()
             self.refresh()
 
-        btn_wrap = ttk.Frame(body, style="App.TFrame", padding=(32, 10, 32, 10))
+        btn_wrap = ttk.Frame(scroll_inner, style="App.TFrame", padding=(pad_x, 8, pad_x, 8))
         btn_wrap.pack(fill="both", expand=True)
         for status in Status:
             ttk.Button(
@@ -972,10 +996,7 @@ class App:
                 text=status.label,
                 style=f"Status{int(status)}.TButton",
                 command=lambda s=status: choose(s),
-            ).pack(fill="x", pady=5)
-
-        foot = ttk.Frame(body, style="App.TFrame", padding=(32, 10, 32, 24))
-        foot.pack(fill="x")
+            ).pack(fill="x", pady=3 if compact else 5)
         ttk.Button(
             foot, text="キャンセル", style="Secondary.TButton",
             command=self._close_dialog,
@@ -995,6 +1016,49 @@ class App:
         self._active_dialog = dlg
         self._dialog_timer = dlg.after(DIALOG_TIMEOUT_MS, self._close_dialog)
         return dlg, body
+
+    def _scrollable_area(self, parent) -> tuple[tk.Frame, tk.Frame, tk.Canvas]:
+        wrap = tk.Frame(parent, bg=BG)
+        canvas = tk.Canvas(wrap, bg=BG, highlightthickness=0, bd=0)
+        canvas.pack(side="left", fill="both", expand=True)
+        sb = ttk.Scrollbar(wrap, orient="vertical", command=canvas.yview)
+        sb.pack(side="right", fill="y")
+        canvas.configure(yscrollcommand=sb.set)
+        inner = tk.Frame(canvas, bg=BG)
+        inner_id = canvas.create_window((0, 0), window=inner, anchor="nw")
+        inner.bind(
+            "<Configure>",
+            lambda _e: canvas.configure(scrollregion=canvas.bbox("all")),
+        )
+        canvas.bind(
+            "<Configure>",
+            lambda e: canvas.itemconfigure(inner_id, width=e.width),
+        )
+        canvas.bind("<MouseWheel>",
+                    lambda e: canvas.yview_scroll(int(-1 * (e.delta / 120)), "units"))
+        canvas.bind("<Button-4>", lambda _e: canvas.yview_scroll(-1, "units"))
+        canvas.bind("<Button-5>", lambda _e: canvas.yview_scroll(1, "units"))
+        # タッチ用のドラッグスクロール(Canvasの空き領域のみ)
+        canvas.bind("<ButtonPress-1>", lambda e: canvas.scan_mark(e.x, e.y))
+        canvas.bind("<B1-Motion>", lambda e: canvas.scan_dragto(e.x, e.y, gain=1))
+        return inner, wrap, canvas
+
+    def _bind_autoscroll_on_focus(self, canvas: tk.Canvas, widget: tk.Widget):
+        def _scroll_into_view(_e=None):
+            canvas.update_idletasks()
+            try:
+                bbox = canvas.bbox("all")
+                if not bbox:
+                    return
+                total_h = bbox[3] - bbox[1]
+                if total_h <= 0:
+                    return
+                y = widget.winfo_rooty() - canvas.winfo_rooty() + canvas.canvasy(0)
+                frac = max(0.0, min(1.0, y / total_h))
+                canvas.yview_moveto(frac)
+            except tk.TclError:
+                pass
+        widget.bind("<FocusIn>", _scroll_into_view, add="+")
 
     def _fit_dialog(self, dlg: tk.Toplevel, desired_w: int, desired_h: int) -> tuple[int, int]:
         """Size dlg to fit the screen (with margin) and center it."""
