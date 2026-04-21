@@ -608,6 +608,8 @@ class App:
         for row in rows:
             self._render_status_card(row)
 
+        self._enable_touch_scroll(self.status_canvas, self.status_frame)
+
         for item in self.log_tree.get_children():
             self.log_tree.delete(item)
         for log in self.db.recent_logs(100):
@@ -819,6 +821,8 @@ class App:
         ttk.Button(btns, text="新規登録", style="Action.TButton", command=submit).pack(side="right", padx=(8, 0))
         ttk.Button(btns, text="キャンセル", style="Secondary.TButton", command=self._close_dialog).pack(side="right")
 
+        self._enable_touch_scroll(scroll_canvas, scroll_inner)
+
     def _open_manual_dialog(self):
         if self._active_dialog and self._active_dialog.winfo_exists():
             return
@@ -960,6 +964,8 @@ class App:
         ttk.Button(btns, text="新規登録", style="Action.TButton", command=submit).pack(side="right", padx=(8, 0))
         ttk.Button(btns, text="キャンセル", style="Secondary.TButton", command=self._close_dialog).pack(side="right")
 
+        self._enable_touch_scroll(scroll_canvas, scroll_inner)
+
     def _open_status_dialog(self, user):
         dlg, body = self._make_dialog("ステータス選択")
         dlg_w, dlg_h = self._fit_dialog(dlg, 460, 600)
@@ -972,7 +978,7 @@ class App:
         foot = ttk.Frame(body, style="App.TFrame", padding=(pad_x, 8, pad_x, 14 if compact else 24))
         foot.pack(side="bottom", fill="x")
 
-        scroll_inner, scroll_wrap, _ = self._scrollable_area(body)
+        scroll_inner, scroll_wrap, scroll_canvas = self._scrollable_area(body)
         scroll_wrap.pack(side="top", fill="both", expand=True)
 
         header = ttk.Frame(scroll_inner, style="App.TFrame", padding=(pad_x, pad_top, pad_x, 8))
@@ -1001,6 +1007,8 @@ class App:
             foot, text="キャンセル", style="Secondary.TButton",
             command=self._close_dialog,
         ).pack(fill="x")
+
+        self._enable_touch_scroll(scroll_canvas, scroll_inner)
 
     def _make_dialog(self, title: str, geometry: str = "") -> tuple[tk.Toplevel, ttk.Frame]:
         dlg = tk.Toplevel(self.root)
@@ -1038,10 +1046,47 @@ class App:
                     lambda e: canvas.yview_scroll(int(-1 * (e.delta / 120)), "units"))
         canvas.bind("<Button-4>", lambda _e: canvas.yview_scroll(-1, "units"))
         canvas.bind("<Button-5>", lambda _e: canvas.yview_scroll(1, "units"))
-        # タッチ用のドラッグスクロール(Canvasの空き領域のみ)
-        canvas.bind("<ButtonPress-1>", lambda e: canvas.scan_mark(e.x, e.y))
-        canvas.bind("<B1-Motion>", lambda e: canvas.scan_dragto(e.x, e.y, gain=1))
         return inner, wrap, canvas
+
+    def _enable_touch_scroll(self, canvas: tk.Canvas, root_widget: tk.Widget,
+                              threshold: int = 8):
+        """中身のどこをドラッグしてもスクロールできるようにする。
+        ドラッグ距離が閾値を超えた時点でクリック動作をキャンセルしスクロールに切り替える。"""
+        state = {"start_y": 0, "scrolling": False}
+
+        def on_press(e):
+            state["start_y"] = e.y_root
+            state["scrolling"] = False
+            canvas.scan_mark(e.x_root, e.y_root)
+
+        def on_motion(e):
+            if not state["scrolling"]:
+                if abs(e.y_root - state["start_y"]) > threshold:
+                    state["scrolling"] = True
+            if state["scrolling"]:
+                canvas.scan_dragto(e.x_root, e.y_root, gain=1)
+                return "break"
+
+        def on_release(_e):
+            was_scrolling = state["scrolling"]
+            state["scrolling"] = False
+            if was_scrolling:
+                return "break"
+
+        def recurse(w):
+            # スクロールバーや Listbox などそれ自身のドラッグ挙動を持つものはスキップ
+            if isinstance(w, (ttk.Scrollbar, tk.Scrollbar, tk.Listbox)):
+                return
+            try:
+                w.bind("<ButtonPress-1>", on_press, add="+")
+                w.bind("<B1-Motion>", on_motion, add="+")
+                w.bind("<ButtonRelease-1>", on_release, add="+")
+            except tk.TclError:
+                pass
+            for c in w.winfo_children():
+                recurse(c)
+
+        recurse(root_widget)
 
     def _bind_autoscroll_on_focus(self, canvas: tk.Canvas, widget: tk.Widget):
         def _scroll_into_view(_e=None):
