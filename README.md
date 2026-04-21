@@ -68,6 +68,19 @@ python index.py --demo
 > Homebrew の `python-tk@3.13` (Tk 9.x) を入れた Python で起動してください。
 > 例: `/opt/homebrew/bin/python3.13 index.py --demo`
 
+## デザイン
+
+UI は Linear にインスパイアされたダークモードネイティブなデザイントークンで構成されています (`ui.py` 冒頭で定義)。
+
+- **背景階層**: `#08090a` (キャンバス) → `#0f1011` (パネル) → `#131416`〜`#1b1c1e` (サーフェス)
+- **テキスト**: `#f7f8f8` / `#d0d6e0` / `#8a8f98` / `#62666d` の 4 段グレースケール
+- **アクセント**: ブランドインディゴ `#5e6ad2` → hover `#7170ff` → active `#828fff` (CTA / ブランドマーク専用)
+- **ボーダー**: ほぼ見えないヘアライン `#1f2123` / `#141516` (半透明白の近似ソリッド)
+- **タイポグラフィ**: `Inter` 優先 (未インストール時は SF Pro / Segoe UI 等へフォールバック)、技術ラベルは `Berkeley Mono` → `SF Mono` / `Menlo`
+- ステータス色は `models.py` の `Status.color` に集約
+
+フォントを Linear に近づけたい場合は [Inter](https://rsms.me/inter/) と [Berkeley Mono](https://berkeleygraphics.com/typefaces/berkeley-mono/) をインストールしてください。
+
 ## 構成
 
 - `index.py` — エントリポイント (CLI 引数、DI)
