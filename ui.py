@@ -1,7 +1,9 @@
 import tkinter as tk
 import tkinter.font as tkfont
-from datetime import datetime
+from datetime import datetime, timedelta, timezone
 from tkinter import messagebox, ttk
+
+JST = timezone(timedelta(hours=9))
 
 from db import Database
 from models import Status
@@ -279,7 +281,9 @@ def _format_timestamp(ts: str | None) -> str:
         return ""
     try:
         dt = datetime.fromisoformat(ts.replace(" ", "T"))
-        return dt.strftime("%m/%d %H:%M")
+        if dt.tzinfo is None:
+            dt = dt.replace(tzinfo=timezone.utc)
+        return dt.astimezone(JST).strftime("%m/%d %H:%M")
     except ValueError:
         return ts.split(".")[0]
 
@@ -332,8 +336,9 @@ class SoftKeyboard(ttk.Frame):
         key_font_size: int = 12,
         key_padx: int = 2,
         key_pady: int = 2,
+        frame_style: str = "App.TFrame",
     ):
-        super().__init__(parent, style="App.TFrame")
+        super().__init__(parent, style=frame_style)
         self._target: tk.Entry | None = None
         self._shift = False
         self._mode = "letter"
@@ -342,6 +347,7 @@ class SoftKeyboard(ttk.Frame):
         self._key_font_size = key_font_size
         self._key_padx = key_padx
         self._key_pady = key_pady
+        self._frame_style = frame_style
         self._build()
 
     def set_target(self, entry: tk.Entry):
@@ -357,7 +363,7 @@ class SoftKeyboard(ttk.Frame):
         else:
             rows = self.LETTER_ROWS
         for row in rows:
-            line = ttk.Frame(self, style="App.TFrame")
+            line = ttk.Frame(self, style=self._frame_style)
             line.pack(pady=self._key_pady)
             for ch in row:
                 key = ch.upper() if (self._shift and self._mode == "letter" and ch.isalpha()) else ch
@@ -365,7 +371,7 @@ class SoftKeyboard(ttk.Frame):
                     side="left", padx=self._key_padx
                 )
 
-        bottom = ttk.Frame(self, style="App.TFrame")
+        bottom = ttk.Frame(self, style=self._frame_style)
         bottom.pack(pady=self._key_pady * 2)
         w = self._key_width
         space_w = max(10, w * 3 + 2)
@@ -583,7 +589,7 @@ class App:
             ).pack(side="left", padx=4)
 
     def _tick_clock(self):
-        self.clock_label.configure(text=datetime.now().strftime("%Y-%m-%d  %H:%M:%S"))
+        self.clock_label.configure(text=datetime.now(JST).strftime("%Y-%m-%d  %H:%M:%S"))
         self.root.after(1000, self._tick_clock)
 
     def refresh(self):
@@ -653,14 +659,9 @@ class App:
 
         Badge(top, status.label if status else "未記録", accent_color).pack(side="right")
 
-        sub = tk.Frame(inner, bg=SURFACE)
-        sub.pack(fill="x", pady=(8, 0))
-        tk.Label(
-            sub, text=f"学籍番号 {row['student_id']}",
-            bg=SURFACE, fg=FG_MUTED,
-            font=(MONO_FONT, 11), anchor="w",
-        ).pack(side="left")
         if row["timestamp"]:
+            sub = tk.Frame(inner, bg=SURFACE)
+            sub.pack(fill="x", pady=(6, 0))
             tk.Label(
                 sub, text=f"更新 {_format_timestamp(row['timestamp'])}",
                 bg=SURFACE, fg=FG_SUBTLE,
@@ -828,57 +829,55 @@ class App:
             return
 
         dlg, body = self._make_dialog("手動追加")
-        dlg_w, dlg_h = self._fit_dialog(dlg, 820, 760)
-        dlg.minsize(min(460, dlg_w), min(480, dlg_h))
+        dlg_w, dlg_h = self._fit_dialog(dlg, 1000, 640)
+        dlg.minsize(min(780, dlg_w), min(440, dlg_h))
 
-        compact = self._compact or dlg_h < 720
-        pad_x = 18 if compact else 28
-        pad_top = 14 if compact else 24
-        pad_gap = 4 if compact else 6
+        compact = self._compact or dlg_h < 640 or dlg_w < 900
+        pad_x = 16 if compact else 24
+        pad_top = 12 if compact else 20
 
-        btns = ttk.Frame(body, style="App.TFrame", padding=(pad_x, 8, pad_x, 16 if compact else 24))
-        btns.pack(side="bottom", fill="x")
+        bottom = ttk.Frame(body, style="App.TFrame",
+                           padding=(pad_x, 6, pad_x, 12 if compact else 20))
+        bottom.pack(side="bottom", fill="x")
+        ttk.Button(bottom, text="キャンセル", style="Secondary.TButton",
+                   command=self._close_dialog).pack(side="right")
 
-        keyboard_wrap = ttk.Frame(body, style="App.TFrame", padding=(pad_x, 8 if compact else 12))
-        keyboard_wrap.pack(side="bottom", fill="x")
-
-        scroll_inner, scroll_wrap, scroll_canvas = self._scrollable_area(body)
-        scroll_wrap.pack(side="top", fill="both", expand=True)
-
-        header = ttk.Frame(scroll_inner, style="App.TFrame", padding=(pad_x, pad_top, pad_x, pad_gap))
-        header.pack(fill="x")
+        header = ttk.Frame(body, style="App.TFrame",
+                           padding=(pad_x, pad_top, pad_x, 4))
+        header.pack(side="top", fill="x")
         ttk.Label(header, text="手動追加", style="DialogHeader.TLabel").pack(anchor="w")
         tk.Label(header,
                  text="カードを持っていない人向けの登録・更新",
-                 bg=BG, fg=FG_MUTED, font=F(12)).pack(anchor="w", pady=(6, 0))
+                 bg=BG, fg=FG_MUTED, font=F(12)).pack(anchor="w", pady=(4, 0))
 
-        content = ttk.Frame(scroll_inner, style="App.TFrame", padding=(pad_x, pad_gap, pad_x, pad_gap))
-        content.pack(fill="x")
+        cols = ttk.Frame(body, style="App.TFrame",
+                         padding=(pad_x, 4, pad_x, 4))
+        cols.pack(side="top", fill="both", expand=True)
+        cols.columnconfigure(0, weight=1, uniform="manualcol")
+        cols.columnconfigure(1, weight=1, uniform="manualcol")
+        cols.rowconfigure(0, weight=1)
 
         existing_users = self.db.list_users()
+
+        # 左カラム: 既存ユーザー一覧
+        left = tk.Frame(cols, bg=SURFACE,
+                        highlightthickness=1, highlightbackground=BORDER)
+        left.grid(row=0, column=0, sticky="nsew", padx=(0, 6))
+        left_inner = tk.Frame(left, bg=SURFACE)
+        left_inner.pack(fill="both", expand=True,
+                        padx=10 if compact else 14, pady=10 if compact else 14)
+
+        tk.Label(left_inner, text="既存ユーザー", bg=SURFACE, fg=FG,
+                 font=F(14, "bold"), anchor="w").pack(anchor="w")
+        tk.Label(left_inner, text="選択してステータスを更新",
+                 bg=SURFACE, fg=FG_MUTED, font=F(11),
+                 anchor="w").pack(anchor="w", pady=(2, 8))
+
         if existing_users:
-            pick = tk.Frame(content, bg=SURFACE,
-                            highlightthickness=1, highlightbackground=BORDER)
-            pick.pack(fill="x", pady=(0, 8 if compact else 14))
-            pick_inner = tk.Frame(pick, bg=SURFACE)
-            pick_inner.pack(fill="x", padx=12 if compact else 18, pady=10 if compact else 16)
-
-            tk.Label(
-                pick_inner, text="既存ユーザーを選択",
-                bg=SURFACE, fg=FG, font=F(14, "bold"),
-                anchor="w",
-            ).pack(anchor="w")
-            tk.Label(
-                pick_inner, text="ステータスを更新するユーザーを選んでください",
-                bg=SURFACE, fg=FG_MUTED, font=F(11),
-                anchor="w",
-            ).pack(anchor="w", pady=(4, 12))
-
-            list_row = tk.Frame(pick_inner, bg=SURFACE)
-            list_row.pack(fill="x")
+            list_row = tk.Frame(left_inner, bg=SURFACE)
+            list_row.pack(fill="both", expand=True)
             users_list = tk.Listbox(
                 list_row,
-                height=min(3 if compact else 5, len(existing_users)),
                 font=F(12 if compact else 13),
                 bg=SURFACE_2, fg=FG_BODY,
                 selectbackground=SELECT_BG, selectforeground=FG,
@@ -887,7 +886,7 @@ class App:
                 activestyle="none", exportselection=False,
                 relief="flat",
             )
-            users_list.pack(side="left", fill="x", expand=True)
+            users_list.pack(side="left", fill="both", expand=True)
             for u in existing_users:
                 users_list.insert(tk.END, f"  {u['name']}   {u['student_id']}")
             sb = ttk.Scrollbar(list_row, orient="vertical", command=users_list.yview)
@@ -904,46 +903,56 @@ class App:
                 self._open_status_dialog(user)
 
             ttk.Button(
-                pick_inner, text="このユーザーを更新",
+                left_inner, text="このユーザーを更新",
                 style="Action.TButton", command=pick_selected,
-            ).pack(anchor="e", pady=(14, 0))
+            ).pack(fill="x", pady=(10, 0))
+        else:
+            tk.Label(left_inner, text="登録済みユーザーはいません",
+                     bg=SURFACE, fg=FG_MUTED, font=F(12)).pack(expand=True)
 
-        form = tk.Frame(content, bg=SURFACE,
-                        highlightthickness=1, highlightbackground=BORDER)
-        form.pack(fill="x")
-        form_inner = tk.Frame(form, bg=SURFACE)
-        form_inner.pack(fill="x", padx=12 if compact else 18, pady=10 if compact else 16)
+        # 右カラム: 新規登録
+        right = tk.Frame(cols, bg=SURFACE,
+                         highlightthickness=1, highlightbackground=BORDER)
+        right.grid(row=0, column=1, sticky="nsew", padx=(6, 0))
+        right_inner = tk.Frame(right, bg=SURFACE)
+        right_inner.pack(fill="both", expand=True,
+                         padx=10 if compact else 14, pady=10 if compact else 14)
 
-        tk.Label(
-            form_inner, text="新規登録（カードなし）",
-            bg=SURFACE, fg=FG, font=F(14, "bold"),
-            anchor="w",
-        ).pack(anchor="w", pady=(0, 8 if compact else 12))
+        tk.Label(right_inner, text="新規登録（カードなし）",
+                 bg=SURFACE, fg=FG, font=F(14, "bold"),
+                 anchor="w").pack(anchor="w")
+        tk.Label(right_inner, text="学籍番号と名前を入力",
+                 bg=SURFACE, fg=FG_MUTED, font=F(11),
+                 anchor="w").pack(anchor="w", pady=(2, 8))
 
-        grid = tk.Frame(form_inner, bg=SURFACE)
+        grid = tk.Frame(right_inner, bg=SURFACE)
         grid.pack(fill="x")
-        row_pady = 3 if compact else 6
+        row_pady = 3 if compact else 5
         tk.Label(grid, text="学籍番号", bg=SURFACE, fg=FG_MUTED,
-                 font=F(12)).grid(row=0, column=0, sticky="w", padx=(0, 14), pady=row_pady)
-        sid_entry = ttk.Entry(grid, font=F(14 if compact else 15), width=28)
+                 font=F(12)).grid(row=0, column=0, sticky="w",
+                                  padx=(0, 10), pady=row_pady)
+        sid_entry = ttk.Entry(grid, font=F(14 if compact else 15))
         sid_entry.grid(row=0, column=1, sticky="ew", pady=row_pady)
         tk.Label(grid, text="名前", bg=SURFACE, fg=FG_MUTED,
-                 font=F(12)).grid(row=1, column=0, sticky="w", padx=(0, 14), pady=row_pady)
-        name_entry = ttk.Entry(grid, font=F(14 if compact else 15), width=28)
+                 font=F(12)).grid(row=1, column=0, sticky="w",
+                                  padx=(0, 10), pady=row_pady)
+        name_entry = ttk.Entry(grid, font=F(14 if compact else 15))
         name_entry.grid(row=1, column=1, sticky="ew", pady=row_pady)
         grid.columnconfigure(1, weight=1)
 
+        kb_holder = tk.Frame(right_inner, bg=SURFACE)
+        kb_holder.pack(fill="x", pady=(8, 0))
         if compact:
-            kb_kwargs = dict(key_width=3, key_height=1, key_font_size=11, key_padx=1, key_pady=1)
+            kb_kwargs = dict(key_width=3, key_height=1, key_font_size=11,
+                             key_padx=1, key_pady=1)
         else:
-            kb_kwargs = dict(key_width=4, key_height=2, key_font_size=12, key_padx=2, key_pady=2)
-        keyboard = SoftKeyboard(keyboard_wrap, **kb_kwargs)
+            kb_kwargs = dict(key_width=4, key_height=2, key_font_size=12,
+                             key_padx=2, key_pady=2)
+        keyboard = SoftKeyboard(kb_holder, frame_style="Surface.TFrame", **kb_kwargs)
         keyboard.pack()
         keyboard.set_target(sid_entry)
         sid_entry.bind("<FocusIn>", lambda _e: keyboard.set_target(sid_entry))
         name_entry.bind("<FocusIn>", lambda _e: keyboard.set_target(name_entry))
-        self._bind_autoscroll_on_focus(scroll_canvas, sid_entry)
-        self._bind_autoscroll_on_focus(scroll_canvas, name_entry)
         sid_entry.focus_set()
 
         def submit():
@@ -961,10 +970,9 @@ class App:
             self._close_dialog()
             self._open_status_dialog(user)
 
-        ttk.Button(btns, text="新規登録", style="Action.TButton", command=submit).pack(side="right", padx=(8, 0))
-        ttk.Button(btns, text="キャンセル", style="Secondary.TButton", command=self._close_dialog).pack(side="right")
-
-        self._enable_touch_scroll(scroll_canvas, scroll_inner)
+        ttk.Button(right_inner, text="新規登録",
+                   style="Action.TButton",
+                   command=submit).pack(fill="x", pady=(10, 0))
 
     def _open_status_dialog(self, user):
         dlg, body = self._make_dialog("ステータス選択")
