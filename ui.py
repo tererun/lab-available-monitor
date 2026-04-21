@@ -997,12 +997,19 @@ class App:
         return dlg, body
 
     def _fit_dialog(self, dlg: tk.Toplevel, desired_w: int, desired_h: int) -> tuple[int, int]:
-        """Size dlg to fit the screen (with small margin) and center it."""
-        margin = 16
-        w = min(desired_w, self._screen_w - margin)
-        h = min(desired_h, self._screen_h - margin)
+        """Size dlg to fit the screen (with margin) and center it."""
+        h_margin = 24
+        # タイトルバー・タスクバー等のウィンドウクローム分を多めに確保
+        # (RPi の自動非表示タスクバーやウィンドウ装飾を考慮)
+        v_margin = 160
+        top_offset = 60
+        bottom_reserve = 80
+        w = min(desired_w, self._screen_w - h_margin)
+        h = min(desired_h, self._screen_h - v_margin)
         x = max(0, (self._screen_w - w) // 2)
-        y = max(0, (self._screen_h - h) // 2)
+        y = max(top_offset, (self._screen_h - h) // 2)
+        if y + h > self._screen_h - bottom_reserve:
+            y = max(top_offset, self._screen_h - bottom_reserve - h)
         dlg.geometry(f"{w}x{h}+{x}+{y}")
         return w, h
 
