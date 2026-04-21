@@ -22,8 +22,26 @@ bash setup.sh
 - `.venv/` に Python 仮想環境を作成し `nfcpy` をインストール
 - RC-S380 を非 root で叩けるように `/etc/udev/rules.d/99-rcs380.rules` を設置
 - 実行ユーザーを `plugdev` グループへ追加
+- **自動起動** (`systemd --user` サービス + XDG autostart) を設定。デスクトップログイン後に起動し、落ちたら自動再起動 (`Restart=always`)
 
 実行後、**一度ログアウト→ログインし直す** (グループ反映のため) こと。RC-S380 も挿し直してください。
+
+### 自動起動の前提 / 運用
+
+- `sudo raspi-config` → `System Options` → `Boot / Auto Login` → **Desktop Autologin** を有効にしておく (GUI セッションが立たないと Tk アプリも起動できないため)
+- 画面常時表示にしたい場合: `sudo raspi-config` → `Display Options` → `Screen Blanking` を Disable
+
+```bash
+# 状態確認
+systemctl --user status lab-monitor.service
+
+# ログ (追従)
+journalctl --user -u lab-monitor.service -f
+
+# 一時停止 / 無効化
+systemctl --user stop lab-monitor.service          # 今すぐ停止
+rm ~/.config/autostart/lab-monitor.desktop         # 次回ログインから起動しない
+```
 
 ## 起動
 
